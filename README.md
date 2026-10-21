@@ -25,6 +25,8 @@ house-elves install
 2. downloads the latest desk and runner;
 3. installs them as services (systemd user units on Linux, launch agents on macOS) and opens the desk.
 
+On a new desk, the **Elves** page opens first: pick the elves you want (weekly status, email and Zulip triage, quarterly review, mvnpm checks), fill in their settings and do a dry run. Their schedules run inside the runner, so there's nothing more to install.
+
 Run `house-elves install` again to update.
 
 ## Commands
@@ -51,5 +53,5 @@ Run `house-elves install` again to update.
 ## Where things are
 
 - `~/.config/house-elves/`: `desk.properties` and `runner.config` (your account, and the tokens: readable only by you).
-- `~/.local/share/house-elves/`: the desk's database, its sessions, the programs (`app/`) and the runner's clones (`runner/`).
+- `~/.local/share/house-elves/`: the desk's database, its sessions, the programs (`app/`), the runner's clones (`runner/`) and the installed elves (`elves/`, with their logs in `elf-logs/`). Each elf's settings are in `~/.config/<elf>/config`.
 - Linux: `~/.config/systemd/user/house-elves-*.service`. macOS: `~/Library/LaunchAgents/io.github.house-elves.*.plist`, with logs in `~/Library/Logs/house-elves/`.
