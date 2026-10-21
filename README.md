@@ -34,6 +34,7 @@ Run `house-elves install` again to update.
 | | |
 |---|---|
 | `house-elves open` | Opens the desk in your browser, signed in. `--print` prints the one-time link instead. |
+| `house-elves remote` | For using the desk from another machine: starts it if it isn't running, and prints the `ssh` command to run there and a one-time link. `--host` sets this machine's name as the other one reaches it. |
 | `house-elves doctor` | Checks the tools, logins, services and the desk, and says how to fix what isn't right. |
 | `house-elves status` | Is the desk running and answering? |
 | `house-elves start`, `stop`, `restart` | The desk and the runner together. |
@@ -48,7 +49,7 @@ Run `house-elves install` again to update.
 - `house-elves open` gives your browser a one-time link that signs it in for 30 days. The desk keeps only hashes of each session's secrets. `house-elves sign-out` signs every browser out at once.
 - GitHub calls use `gh auth token` for the account you picked. Every write to GitHub (a review, a comment, a push, a merge) still waits for your click.
 - The agent runs in a sandbox with no GitHub credentials: it can't read your home, `gh`'s login or (on macOS) the Keychain.
-- To use the desk from another machine, forward the port over SSH: `ssh -L 7777:localhost:7777 <laptop>`, then run `house-elves open --print` on the laptop.
+- To use the desk from another machine, run `house-elves remote` on the machine it runs on: it prints the `ssh -N -L 7777:localhost:7777 …` command that forwards the port, and a one-time link to open at the other end. The desk still only listens on `127.0.0.1`.
 
 ## Where things are
 

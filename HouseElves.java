@@ -39,9 +39,9 @@ import picocli.CommandLine.Option;
  * House Elves on your laptop: installs Elf Desk and its runner as services (systemd on Linux, launchd on macOS),
  * checks that everything they need is there and logged in (doctor), and opens the desk in your browser.
  */
-@Command(name = "house-elves", mixinStandardHelpOptions = true, version = "house-elves 0.1.1",
+@Command(name = "house-elves", mixinStandardHelpOptions = true, version = "house-elves 0.1.2",
         description = "Elf Desk and its elves on this machine.",
-        subcommands = { HouseElves.Install.class, HouseElves.Doctor.class, HouseElves.Open.class,
+        subcommands = { HouseElves.Install.class, HouseElves.Doctor.class, HouseElves.Open.class, HouseElves.Remote.class,
                 HouseElves.Start.class, HouseElves.Stop.class, HouseElves.Restart.class, HouseElves.Status.class,
                 HouseElves.Logs.class, HouseElves.SignOut.class, HouseElves.Uninstall.class })
 public class HouseElves {
@@ -518,6 +518,37 @@ public class HouseElves {
             if (!r.ok()) {
                 say("Couldn't open a browser. Open this link (it works once):\n" + url);
             }
+            return 0;
+        }
+    }
+
+    @Command(name = "remote", description = "Use the desk from another machine: starts it if needed, then prints the ssh command to run there and a one-time link.")
+    static class Remote implements Callable<Integer> {
+
+        @Option(names = "--host", description = "This machine's name or address as the other machine reaches it (default: its host name).")
+        String host;
+
+        @Override
+        public Integer call() throws Exception {
+            if (!deskReady()) {
+                say("Starting the desk…");
+                for (Service s : Service.values()) s.start();
+                if (!waitForDesk(Duration.ofSeconds(90))) {
+                    say("The desk didn't come up: house-elves logs desk");
+                    return 1;
+                }
+            }
+            if (LINUX && !run(List.of("systemctl", "is-active", "--quiet", "sshd")).ok()) {
+                say("SSH isn't running on this machine, so the other one can't connect: sudo systemctl enable --now sshd\n");
+            }
+            String me = System.getProperty("user.name") + "@"
+                    + (host != null ? host : java.net.InetAddress.getLocalHost().getHostName());
+            // The desk only listens on 127.0.0.1: the tunnel brings the other machine's port to it, and its browser
+            // sends elf-desk.localhost to itself, so the desk's own name and cookie work there unchanged.
+            say("On the other machine, run this and leave it open:\n\n  ssh -N -L " + PORT + ":localhost:" + PORT + " " + me
+                    + "\n\nThen open this link there in Chrome, Firefox or Edge (it works once):\n\n  " + deskUrl()
+                    + "/open?code=" + Files.readString(DATA.resolve("open-code")).strip()
+                    + "\n\nAfter that, " + deskUrl() + " opens the desk there for 30 days, while the ssh command runs.");
             return 0;
         }
     }
