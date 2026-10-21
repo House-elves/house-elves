@@ -42,8 +42,8 @@ Run `house-elves install` again to update.
 ## How it keeps the desk yours
 
 - The desk listens on `127.0.0.1` only, and only answers requests addressed to a local name (so a web page can't reach it by pointing its own domain at your machine).
-- It lives at its own name, <http://elf-desk.localhost:7777>, which Chrome, Firefox and Edge send to your machine themselves. Browsers keep cookies per name, not per port, so its sign-in cookie never reaches other servers on `localhost`, such as an agent's dev mode. Only the desk's own pages may send it anything, and no other site may show it in a frame.
-- `house-elves open` gives your browser a one-time link that signs it in for 30 days. The desk keeps only a hash of each session. `house-elves sign-out` signs every browser out at once.
+- It lives at its own name, <http://elf-desk.localhost:7777>, which Chrome, Firefox and Edge send to your machine themselves, so its cookie isn't sent to other servers on `localhost`, such as an agent's dev mode. Cookies are still shared by every port of a name, so the cookie alone opens nothing: the desk's data also needs a page key that only its own pages can read. Only the desk's own pages may send it anything, and no other site may show it in a frame.
+- `house-elves open` gives your browser a one-time link that signs it in for 30 days. The desk keeps only hashes of each session's secrets. `house-elves sign-out` signs every browser out at once.
 - GitHub calls use `gh auth token` for the account you picked. Every write to GitHub (a review, a comment, a push, a merge) still waits for your click.
 - The agent runs in a sandbox with no GitHub credentials: it can't read your home, `gh`'s login or (on macOS) the Keychain.
 - To use the desk from another machine, forward the port over SSH: `ssh -L 7777:localhost:7777 <laptop>`, then run `house-elves open --print` on the laptop.
