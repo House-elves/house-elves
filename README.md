@@ -36,12 +36,14 @@ Run `house-elves install` again to update.
 | `house-elves status` | Is the desk running and answering? |
 | `house-elves start`, `stop`, `restart` | The desk and the runner together. |
 | `house-elves logs desk`, `logs runner` | Their latest log lines. |
+| `house-elves sign-out` | Signs every browser out of the desk. |
 | `house-elves uninstall` | Removes the services and programs. Keeps your data and settings unless `--all`. |
 
 ## How it keeps the desk yours
 
-- The desk listens on `127.0.0.1` only, and only answers requests addressed to `localhost` (so a web page can't reach it by pointing its own domain at your machine).
-- You get in with a key only you can read (`~/.local/share/house-elves/desk.key`). `house-elves open` gives your browser a one-time link that sets it as a cookie.
+- The desk listens on `127.0.0.1` only, and only answers requests addressed to a local name (so a web page can't reach it by pointing its own domain at your machine).
+- It lives at its own name, <http://elf-desk.localhost:7777>, which Chrome, Firefox and Edge send to your machine themselves. Browsers keep cookies per name, not per port, so its sign-in cookie never reaches other servers on `localhost`, such as an agent's dev mode. Only the desk's own pages may send it anything, and no other site may show it in a frame.
+- `house-elves open` gives your browser a one-time link that signs it in for 30 days. The desk keeps only a hash of each session. `house-elves sign-out` signs every browser out at once.
 - GitHub calls use `gh auth token` for the account you picked. Every write to GitHub (a review, a comment, a push, a merge) still waits for your click.
 - The agent runs in a sandbox with no GitHub credentials: it can't read your home, `gh`'s login or (on macOS) the Keychain.
 - To use the desk from another machine, forward the port over SSH: `ssh -L 7777:localhost:7777 <laptop>`, then run `house-elves open --print` on the laptop.
@@ -49,5 +51,5 @@ Run `house-elves install` again to update.
 ## Where things are
 
 - `~/.config/house-elves/`: `desk.properties` and `runner.config` (your account, and the tokens: readable only by you).
-- `~/.local/share/house-elves/`: the desk's database, its key, the programs (`app/`) and the runner's clones (`runner/`).
+- `~/.local/share/house-elves/`: the desk's database, its sessions, the programs (`app/`) and the runner's clones (`runner/`).
 - Linux: `~/.config/systemd/user/house-elves-*.service`. macOS: `~/Library/LaunchAgents/io.github.house-elves.*.plist`, with logs in `~/Library/Logs/house-elves/`.

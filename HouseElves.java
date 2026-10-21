@@ -39,11 +39,11 @@ import picocli.CommandLine.Option;
  * House Elves on your laptop: installs Elf Desk and its runner as services (systemd on Linux, launchd on macOS),
  * checks that everything they need is there and logged in (doctor), and opens the desk in your browser.
  */
-@Command(name = "house-elves", mixinStandardHelpOptions = true, version = "house-elves 0.1.0",
+@Command(name = "house-elves", mixinStandardHelpOptions = true, version = "house-elves 0.1.1",
         description = "Elf Desk and its elves on this machine.",
         subcommands = { HouseElves.Install.class, HouseElves.Doctor.class, HouseElves.Open.class,
                 HouseElves.Start.class, HouseElves.Stop.class, HouseElves.Restart.class, HouseElves.Status.class,
-                HouseElves.Logs.class, HouseElves.Uninstall.class })
+                HouseElves.Logs.class, HouseElves.SignOut.class, HouseElves.Uninstall.class })
 public class HouseElves {
 
     static final ObjectMapper JSON = new ObjectMapper();
@@ -55,6 +55,17 @@ public class HouseElves {
     static final Path APP = DATA.resolve("app");
     static final String RELEASES = "https://github.com/House-elves/%s/releases/latest/download/%s";
     static final int PORT = Integer.parseInt(System.getenv().getOrDefault("HOUSE_ELVES_PORT", "7777"));
+    /** The desk's own name (elfdesk.host): browsers send *.localhost to this machine, and its cookie stays there. */
+    static String deskUrl() {
+        String host;
+        try {
+            host = readProps(CONFIG.resolve("desk.properties")).getOrDefault("elfdesk.host", "elf-desk.localhost");
+        } catch (IOException e) {
+            host = "elf-desk.localhost";
+        }
+        return "http://" + host + ":" + PORT;
+    }
+
     /** A second install beside the first (for trying a build): its services are named with this suffix. */
     static final String INSTANCE = System.getenv().getOrDefault("HOUSE_ELVES_INSTANCE", "");
 
@@ -312,7 +323,7 @@ public class HouseElves {
                 say("The desk didn't come up. See: house-elves logs desk");
                 return 1;
             }
-            say("Elf Desk is up on http://localhost:" + PORT);
+            say("Elf Desk is up on " + deskUrl());
             if (!noOpen) return new Open().call();
             say("Open it with: house-elves open");
             return 0;
@@ -414,7 +425,7 @@ public class HouseElves {
                     else fail(s.unit + " isn't running", "Run house-elves start, and house-elves logs " + (s == Service.DESK ? "desk" : "runner") + " if it stops again.");
                 }
                 if (Service.DESK.running()) {
-                    if (deskReady()) ok("The desk answers on http://localhost:" + PORT);
+                    if (deskReady()) ok("The desk answers on " + deskUrl());
                     else fail("The desk doesn't answer on port " + PORT, "See house-elves logs desk.");
                 }
             }
@@ -474,6 +485,17 @@ public class HouseElves {
 
     // ---- open, start, stop, status, logs, uninstall ----
 
+    @Command(name = "sign-out", description = "Sign every browser out of the desk (house-elves open signs you in again).")
+    static class SignOut implements Callable<Integer> {
+        @Override
+        public Integer call() throws IOException {
+            // The desk keeps its sessions in this file and reads it again when it changes: without it, none are valid.
+            Files.deleteIfExists(DATA.resolve("sessions"));
+            say("Signed every browser out. Run house-elves open to sign in again.");
+            return 0;
+        }
+    }
+
     @Command(name = "open", description = "Open the desk in your browser, signed in.")
     static class Open implements Callable<Integer> {
 
@@ -487,7 +509,7 @@ public class HouseElves {
                 say("The desk hasn't started yet. Run house-elves start (or house-elves install).");
                 return 1;
             }
-            String url = "http://localhost:" + PORT + "/open?code=" + Files.readString(codeFile).strip();
+            String url = deskUrl() + "/open?code=" + Files.readString(codeFile).strip();
             if (print) {
                 say(url);
                 return 0;
@@ -536,7 +558,7 @@ public class HouseElves {
             for (Service s : Service.values()) {
                 say(s.unit + ": " + (!s.installed() ? "not installed" : s.running() ? "running" : "stopped"));
             }
-            if (Service.DESK.running()) say("desk: " + (deskReady() ? "answering on http://localhost:" + PORT : "not answering yet"));
+            if (Service.DESK.running()) say("desk: " + (deskReady() ? "answering on " + deskUrl() : "not answering yet"));
             return 0;
         }
     }
