@@ -13,12 +13,21 @@ You need [jbang](https://www.jbang.dev) (it brings Java itself), plus:
 - **Linux:** bubblewrap (`dnf install bubblewrap` or `apt install bubblewrap`), the agent's sandbox. **macOS:** nothing more (it uses the built-in `sandbox-exec`).
 - **Optional:** Podman or Docker, for agent reviews whose tests use Dev Services or Testcontainers.
 
-Then:
+Then trust House-elves' scripts in jbang (so it doesn't stop to ask, and the desk's Update button can run the
+installer later) and install the `house-elves` command:
 
 ```
+curl -Ls https://sh.jbang.dev | bash -s - trust add https://github.com/House-elves/
 curl -Ls https://sh.jbang.dev | bash -s - app install house-elves@House-elves
+```
+
+Open a new terminal (so `house-elves` is on your PATH), then:
+
+```
 house-elves install
 ```
+
+If something's missing, `house-elves doctor` says what and how to fix it.
 
 `install` checks all of that first and says exactly what's missing. It then:
 1. asks which `gh` account the desk works as, and who the agent's commits are by;
