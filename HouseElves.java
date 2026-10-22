@@ -331,9 +331,12 @@ public class HouseElves {
 
         String pickAccount() throws IOException {
             List<String> logins = new ArrayList<>();
-            for (JsonNode a : JSON.readTree(run(List.of("gh", "auth", "status", "--json", "hosts")).out)
-                    .path("hosts").path("github.com")) {
+            for (JsonNode a : ghLogins()) {
                 if (a.path("state").asText().equals("success")) logins.add(a.path("login").asText());
+            }
+            if (logins.isEmpty()) {
+                say("gh isn't logged in to GitHub. Run: gh auth login, then house-elves install again.");
+                return null;
             }
             if (logins.size() == 1) return logins.get(0);
             say("\ngh is logged in to several GitHub accounts. Which one should the desk work as?");
@@ -443,9 +446,7 @@ public class HouseElves {
         }
 
         void ghAccounts() throws IOException {
-            Result r = run(List.of("gh", "auth", "status", "--json", "hosts"));
-            List<JsonNode> accounts = new ArrayList<>();
-            if (r.ok()) JSON.readTree(r.out).path("hosts").path("github.com").forEach(accounts::add);
+            List<JsonNode> accounts = ghLogins();
             if (accounts.isEmpty()) {
                 fail("gh isn't logged in to GitHub", "Run: gh auth login");
                 return;
@@ -644,6 +645,21 @@ public class HouseElves {
     }
 
     // ---- helpers ----
+
+    /**
+     * gh's logins on github.com, as {@code gh auth status --json hosts} lists them; none when it isn't logged in (it
+     * then says so in words, not JSON).
+     */
+    static List<JsonNode> ghLogins() {
+        Result r = run(List.of("gh", "auth", "status", "--json", "hosts"));
+        List<JsonNode> out = new ArrayList<>();
+        try {
+            if (r.ok()) JSON.readTree(r.out).path("hosts").path("github.com").forEach(out::add);
+        } catch (IOException e) {
+            // "You are not logged into any GitHub hosts": no logins
+        }
+        return out;
+    }
 
     record Result(int code, String out) {
         boolean ok() {
