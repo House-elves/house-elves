@@ -25,7 +25,7 @@ house-elves install
 2. downloads the latest desk and runner;
 3. installs them as services (systemd user units on Linux, launch agents on macOS) and opens the desk.
 
-On a new desk, the **+** page opens first: add the elves you want (Mail, Zulip, Weekly status, Quarterly review, mvnpm checks), and each one's new tab asks for its settings. Their schedules run inside the runner, so there's nothing more to install.
+On a new desk, the **+** page opens first: add the elves you want (GitHub for your board of PRs and issues, then Mail, Zulip, Weekly status, Quarterly review, mvnpm checks), and each one's new tab asks for its settings. Their schedules run inside the runner, so there's nothing more to install.
 
 Run `house-elves install` again to update.
 
