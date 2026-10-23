@@ -39,7 +39,7 @@ import picocli.CommandLine.Option;
  * House Elves on your laptop: installs Elf Desk and its runner as services (systemd on Linux, launchd on macOS),
  * checks that everything they need is there and logged in (doctor), and opens the desk in your browser.
  */
-@Command(name = "house-elves", mixinStandardHelpOptions = true, version = "house-elves 0.1.3",
+@Command(name = "house-elves", mixinStandardHelpOptions = true, version = "house-elves 0.1.4",
         description = "Elf Desk and its elves on this machine.",
         subcommands = { HouseElves.Install.class, HouseElves.Doctor.class, HouseElves.Open.class, HouseElves.Remote.class,
                 HouseElves.Start.class, HouseElves.Stop.class, HouseElves.Restart.class, HouseElves.Status.class,
@@ -69,10 +69,14 @@ public class HouseElves {
     /** A second install beside the first (for trying a build): its services are named with this suffix. */
     static final String INSTANCE = System.getenv().getOrDefault("HOUSE_ELVES_INSTANCE", "");
 
-    /** What the services need to find this install's config and data, when they aren't in the usual places. */
+    /**
+     * What the services need to find this install's config and data, when they aren't in the usual places, and which
+     * install they are: the update the desk starts runs house-elves install with these, so a second install updates
+     * itself and not the first.
+     */
     static Map<String, String> serviceEnv() {
         Map<String, String> env = new LinkedHashMap<>();
-        for (String k : List.of("HOUSE_ELVES_CONFIG", "HOUSE_ELVES_DATA")) {
+        for (String k : List.of("HOUSE_ELVES_CONFIG", "HOUSE_ELVES_DATA", "HOUSE_ELVES_INSTANCE", "HOUSE_ELVES_PORT")) {
             if (System.getenv(k) != null) env.put(k, System.getenv(k));
         }
         return env;
