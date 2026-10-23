@@ -39,11 +39,11 @@ import picocli.CommandLine.Option;
  * House Elves on your laptop: installs Elf Desk and its runner as services (systemd on Linux, launchd on macOS),
  * checks that everything they need is there and logged in (doctor), and opens the desk in your browser.
  */
-@Command(name = "house-elves", mixinStandardHelpOptions = true, version = "house-elves 0.1.2",
+@Command(name = "house-elves", mixinStandardHelpOptions = true, version = "house-elves 0.1.3",
         description = "Elf Desk and its elves on this machine.",
         subcommands = { HouseElves.Install.class, HouseElves.Doctor.class, HouseElves.Open.class, HouseElves.Remote.class,
                 HouseElves.Start.class, HouseElves.Stop.class, HouseElves.Restart.class, HouseElves.Status.class,
-                HouseElves.Logs.class, HouseElves.SignOut.class, HouseElves.Uninstall.class })
+                HouseElves.Logs.class, HouseElves.CheckElf.class, HouseElves.SignOut.class, HouseElves.Uninstall.class })
 public class HouseElves {
 
     static final ObjectMapper JSON = new ObjectMapper();
@@ -615,6 +615,42 @@ public class HouseElves {
                         .inheritIO().start().waitFor();
             }
             return 0;
+        }
+    }
+
+    @Command(name = "check-elf", description = "Check an elf you're writing the way installing it does: its elf.yaml, its files, and nothing private in them.")
+    static class CheckElf implements Callable<Integer> {
+        @CommandLine.Parameters(description = "The elf's folder", defaultValue = ".")
+        Path folder;
+
+        @Override
+        public Integer call() throws Exception {
+            Path jar = APP.resolve("elf-runner.jar");
+            if (!Files.isRegularFile(jar)) {
+                say("The runner isn't installed: run house-elves install first, or use");
+                say("  jbang https://github.com/House-elves/elf-runner/blob/main/ElfRunner.java --check-elf " + folder);
+                return 1;
+            }
+            // A runner from before --check-elf would ignore it and start as a second runner: only one that knows it.
+            if (!knowsCheckElf(jar)) {
+                say("The installed runner can't check elves yet: update it with house-elves install.");
+                return 1;
+            }
+            return new ProcessBuilder(javaFor25(), "-jar", jar.toString(), "--check-elf", folder.toAbsolutePath().toString())
+                    .inheritIO().start().waitFor();
+        }
+    }
+
+    /** The runner jar's ElfRunner class has the --check-elf option (0.37.1 on). */
+    static boolean knowsCheckElf(Path jar) {
+        try (var zip = new java.util.zip.ZipFile(jar.toFile())) {
+            var entry = zip.getEntry("ElfRunner.class");
+            if (entry == null) return false;
+            try (var in = zip.getInputStream(entry)) {
+                return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.ISO_8859_1).contains("--check-elf");
+            }
+        } catch (IOException e) {
+            return false;
         }
     }
 
