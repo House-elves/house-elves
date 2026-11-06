@@ -39,11 +39,11 @@ import picocli.CommandLine.Option;
  * House Elves on your laptop: installs Elf Desk and its runner as services (systemd on Linux, launchd on macOS),
  * checks that everything they need is there and logged in (doctor), and opens the desk in your browser.
  */
-@Command(name = "house-elves", mixinStandardHelpOptions = true, version = "house-elves 0.1.4",
+@Command(name = "house-elves", mixinStandardHelpOptions = true, version = "house-elves 0.1.5",
         description = "Elf Desk and its elves on this machine.",
         subcommands = { HouseElves.Install.class, HouseElves.Doctor.class, HouseElves.Open.class, HouseElves.Remote.class,
                 HouseElves.Start.class, HouseElves.Stop.class, HouseElves.Restart.class, HouseElves.Status.class,
-                HouseElves.Logs.class, HouseElves.CheckElf.class, HouseElves.SignOut.class, HouseElves.Uninstall.class })
+                HouseElves.Logs.class, HouseElves.CheckElf.class, HouseElves.Resume.class, HouseElves.SignOut.class, HouseElves.Uninstall.class })
 public class HouseElves {
 
     static final ObjectMapper JSON = new ObjectMapper();
@@ -619,6 +619,132 @@ public class HouseElves {
                         .inheritIO().start().waitFor();
             }
             return 0;
+        }
+    }
+
+    @Command(name = "resume", description = "Continue a Sessions chat in Claude Code in this terminal, in the session's own clone, as you; the desk picks it up again when you exit.")
+    static class Resume implements Callable<Integer> {
+        @CommandLine.Parameters(description = "The session's id (s...), from its break out button")
+        String id;
+
+        static final Path SESSIONS = Path.of(HOME, ".config", "sessions");
+
+        @Override
+        public Integer call() throws Exception {
+            if (!id.matches("s[0-9]{10,16}")) {
+                say("That isn't a session's id: copy the command from the session's break out button.");
+                return 1;
+            }
+            Path file = SESSIONS.resolve("sessions").resolve(id + ".json");
+            if (!Files.isRegularFile(file)) {
+                say("There's no session " + id + " on this machine.");
+                return 1;
+            }
+            Path work = runnerWorkDir();
+            Path clone, transcript, mine;
+            String claudeId;
+            // Under Sessions' own lock: no turn starts while it's open here, and none is running now.
+            try (var ch = java.nio.channels.FileChannel.open(SESSIONS.resolve("sessions.lock"),
+                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE);
+                 var lock = ch.lock()) {
+                var s = (com.fasterxml.jackson.databind.node.ObjectNode) JSON.readTree(file.toFile());
+                if (s.path("agent").asText("claude").equals("bob")) {
+                    say("This session is IBM Bob's: only Claude Code sessions can be resumed in a terminal.");
+                    return 1;
+                }
+                claudeId = s.path("session").asText("");
+                if (!claudeId.matches("[0-9a-f-]{36}")) {
+                    say("Its agent hasn't finished a turn yet: resume it once it has.");
+                    return 1;
+                }
+                for (JsonNode t : s.path("turns")) {
+                    if (t.path("status").asText().equals("running")) {
+                        say("Its agent is working on a message: resume it when that's done (or stop it on the desk).");
+                        return 1;
+                    }
+                }
+                if (open(s)) {
+                    say("It's open in another terminal already.");
+                    return 1;
+                }
+                String repo = s.path("repo").asText();
+                if (!repo.matches("[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100}")) throw new IllegalStateException("its repo isn't a repo");
+                clone = work.resolve("worktrees").resolve("slots").resolve(repo.replace('/', '_')).resolve("sessions_" + id);
+                if (!Files.isDirectory(clone.resolve(".git"))) {
+                    say("Its clone isn't on this machine (" + clone + ").");
+                    return 1;
+                }
+                // Claude Code keeps a session under its folder's path, letters and digits only.
+                String project = clone.toString().replaceAll("[^A-Za-z0-9]", "-");
+                transcript = work.resolve("claude").resolve("projects").resolve(project);
+                Path yours = Path.of(System.getenv().getOrDefault("CLAUDE_CONFIG_DIR", HOME + "/.claude"));
+                mine = yours.resolve("projects").resolve(project);
+                if (!Files.isRegularFile(transcript.resolve(claudeId + ".jsonl"))) {
+                    say("Its Claude Code session isn't in the runner's folder (" + transcript + ").");
+                    return 1;
+                }
+                copySession(transcript, mine, claudeId);
+                s.putObject("terminal").put("at", java.time.Instant.now().toString()).put("pid", ProcessHandle.current().pid());
+                save(file, s);
+            }
+            int code;
+            try {
+                say("Resuming " + id + " in Claude Code, in " + clone);
+                say("This is your own Claude Code, as you, outside the runner's sandbox. The desk waits until you exit; then");
+                say("its next message carries on from here. Commit your work in this clone for the desk's push.");
+                code = new ProcessBuilder("claude", "--resume", claudeId).directory(clone.toFile()).inheritIO().start().waitFor();
+            } finally {
+                try (var ch = java.nio.channels.FileChannel.open(SESSIONS.resolve("sessions.lock"),
+                        java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE);
+                     var lock = ch.lock()) {
+                    // What you did here, back where the desk's agent resumes it.
+                    if (Files.isRegularFile(mine.resolve(claudeId + ".jsonl"))) copySession(mine, transcript, claudeId);
+                    var s = (com.fasterxml.jackson.databind.node.ObjectNode) JSON.readTree(file.toFile());
+                    s.remove("terminal");
+                    save(file, s);
+                }
+            }
+            say("Back on the desk: " + id + " carries on from here with your next message there.");
+            return code;
+        }
+
+        /** Open in a terminal now: one that says so, and is still running. */
+        static boolean open(JsonNode s) {
+            long pid = s.path("terminal").path("pid").asLong(0);
+            return pid > 0 && ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);
+        }
+
+        /** A Claude Code session: its transcript, and its folder of subagents and tool results, if it has one. */
+        static void copySession(Path from, Path to, String claudeId) throws IOException {
+            Files.createDirectories(to);
+            Files.copy(from.resolve(claudeId + ".jsonl"), to.resolve(claudeId + ".jsonl"), StandardCopyOption.REPLACE_EXISTING);
+            Path dir = from.resolve(claudeId);
+            if (Files.isDirectory(dir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                try (var all = Files.walk(dir)) {
+                    for (Path p : all.toList()) {
+                        Path target = to.resolve(claudeId).resolve(dir.relativize(p).toString());
+                        if (Files.isDirectory(p, java.nio.file.LinkOption.NOFOLLOW_LINKS)) Files.createDirectories(target);
+                        else if (Files.isRegularFile(p, java.nio.file.LinkOption.NOFOLLOW_LINKS)) Files.copy(p, target, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                }
+            }
+        }
+
+        static void save(Path file, JsonNode s) throws IOException {
+            Path tmp = file.resolveSibling(file.getFileName() + ".new");
+            Files.writeString(tmp, JSON.writerWithDefaultPrettyPrinter().writeValueAsString(s));
+            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        }
+
+        /** The runner's folder (WORK_DIR in its config), as the runner reads it. */
+        static Path runnerWorkDir() throws IOException {
+            Path cfg = CONFIG.resolve("runner.config");
+            if (Files.isRegularFile(cfg)) {
+                for (String line : Files.readAllLines(cfg)) {
+                    if (line.startsWith("WORK_DIR=")) return Path.of(line.substring(9).strip());
+                }
+            }
+            return DATA.resolve("runner");
         }
     }
 

@@ -48,6 +48,7 @@ Run `house-elves install` again to update.
 | `house-elves status` | Is the desk running and answering? |
 | `house-elves start`, `stop`, `restart` | The desk and the runner together. |
 | `house-elves logs desk`, `logs runner` | Their latest log lines. |
+| `house-elves resume <session>` | Carries a Sessions chat on in Claude Code in this terminal, in the session's own clone, as you (its break out button gives the command). The desk waits while it's open, and its next message carries on from there. |
 | `house-elves check-elf [folder]` | For writing an elf: checks it the way installing it does, and that it carries no tokens or keys. See [elf-template](https://github.com/House-elves/elf-template). |
 | `house-elves sign-out` | Signs every browser out of the desk. |
 | `house-elves uninstall` | Removes the services and programs. Keeps your data and settings unless `--all`. |
