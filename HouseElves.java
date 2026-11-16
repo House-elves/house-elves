@@ -138,8 +138,22 @@ public class HouseElves {
         }
 
         void stop() {
-            if (MAC) run(List.of("launchctl", "bootout", target()));
-            else run(List.of("systemctl", "--user", "stop", unit));
+            if (MAC) {
+                run(List.of("launchctl", "bootout", target()));
+                // bootout returns before launchd has removed the service: until it's gone, start() would kickstart
+                // a service on its way out and leave nothing running.
+                long end = System.nanoTime() + Duration.ofSeconds(30).toNanos();
+                while (System.nanoTime() < end && run(List.of("launchctl", "print", target())).ok()) {
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+            } else {
+                run(List.of("systemctl", "--user", "stop", unit));
+            }
         }
 
         void restart() {
